@@ -32,9 +32,12 @@ docker build -t chaoszhu/browser-use-api:latest .
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+venv\Scripts\activate  # On Mac: source venv/bin/activate
 
 pip install -r requirements.txt
+
+playwright install --with-deps chromium
 
 cp .env-example .env
 

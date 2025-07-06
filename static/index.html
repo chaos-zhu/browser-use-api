@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browser Use - 自动化浏览器控制台</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部导航 -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-robot"></i> Browser Use Console</h1>
+                <div class="header-actions">
+                    <button id="apiKeyBtn" class="btn btn-secondary">
+                        <i class="fas fa-key"></i> API密钥
+                    </button>
+                    <button id="refreshBtn" class="btn btn-secondary">
+                        <i class="fas fa-sync-alt"></i> 刷新
+                    </button>
+                    <div class="status-indicator" id="apiStatus">
+                        <span class="status-dot"></span>
+                        <span class="status-text">连接中...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主要内容区域 -->
+        <main class="main-content">
+            <!-- 任务创建面板 -->
+            <section class="panel create-task-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-plus-circle"></i> 创建新任务</h2>
+                    <button class="panel-toggle" data-target="createTaskForm">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                <div class="panel-content" id="createTaskForm">
+                    <form id="taskForm" class="task-form">
+                        <div class="form-group">
+                            <label for="taskDescription">任务描述</label>
+                            <textarea
+                                id="taskDescription"
+                                name="task"
+                                placeholder="请描述您希望浏览器执行的任务，例如：'访问百度搜索Python教程'"
+                                required
+                            ></textarea>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="aiProvider">AI 提供商</label>
+                                <select id="aiProvider" name="ai_provider">
+                                    <option value="">使用默认</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="google">Google AI</option>
+                                    <option value="anthropic">Anthropic</option>
+                                    <option value="mistral">Mistral AI</option>
+                                    <option value="ollama">Ollama</option>
+                                    <option value="azure">Azure OpenAI</option>
+                                    <option value="bedrock">AWS Bedrock</option>
+                                    <option value="groq">Groq</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="saveBrowserData" name="save_browser_data">
+                                    <span class="checkmark"></span>
+                                    保存浏览器数据
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="headful" name="headful">
+                                    <span class="checkmark"></span>
+                                    显示浏览器窗口
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="useCustomChrome" name="use_custom_chrome">
+                                    <span class="checkmark"></span>
+                                    使用自定义Chrome
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-large">
+                            <i class="fas fa-play"></i> 启动任务
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- 任务列表面板 -->
+            <section class="panel task-list-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-list"></i> 任务列表</h2>
+                    <div class="panel-actions">
+                        <select id="statusFilter" class="filter-select">
+                            <option value="">所有状态</option>
+                            <option value="created">已创建</option>
+                            <option value="running">运行中</option>
+                            <option value="finished">已完成</option>
+                            <option value="failed">失败</option>
+                            <option value="stopped">已停止</option>
+                            <option value="paused">已暂停</option>
+                        </select>
+                        <button class="panel-toggle" data-target="taskList">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-content" id="taskList">
+                    <div class="task-grid" id="taskGrid">
+                        <div class="loading-placeholder">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>加载任务列表...</p>
+                        </div>
+                    </div>
+                    <div class="pagination" id="pagination">
+                        <!-- 分页控件将在这里动态生成 -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- API密钥模态框 -->
+            <div id="apiKeyModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>API密钥设置</h3>
+                        <button class="modal-close" data-modal="apiKeyModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="api-key-form">
+                            <div class="form-group">
+                                <label for="apiKeyInput">API密钥</label>
+                                <div class="input-group">
+                                    <input type="password" id="apiKeyInput" placeholder="请输入您的API密钥（可选）">
+                                    <button type="button" id="toggleApiKeyVisibility" class="btn btn-secondary">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <small class="form-help">
+                                    如果服务器配置了API密钥认证，请在此输入。留空则使用匿名访问。
+                                </small>
+                            </div>
+                            <div class="form-actions">
+                                <button id="saveApiKey" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> 保存
+                                </button>
+                                <button id="clearApiKey" class="btn btn-secondary">
+                                    <i class="fas fa-trash"></i> 清除
+                                </button>
+                                <button id="testApiKey" class="btn btn-secondary">
+                                    <i class="fas fa-check"></i> 测试连接
+                                </button>
+                            </div>
+                            <div id="apiKeyStatus" class="api-key-status"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 任务详情模态框 -->
+            <div id="taskModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="modalTitle">任务详情</h3>
+                        <button class="modal-close" data-modal="taskModal">&times;</button>
+                    </div>
+                    <div class="modal-body" id="modalBody">
+                        <!-- 任务详情内容将在这里动态生成 -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 底部状态栏 -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <span>Browser Use API v1.0</span>
+                    <span id="taskCount">任务总数: 0</span>
+                </div>
+                <div class="footer-actions">
+                    <button id="clearCompletedBtn" class="btn btn-small">
+                        <i class="fas fa-trash"></i> 清理已完成
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 通知容器 -->
+    <div id="notifications" class="notifications"></div>
+
+    <!-- JavaScript -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
