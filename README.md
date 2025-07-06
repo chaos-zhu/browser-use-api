@@ -22,6 +22,11 @@ mv .env-example .env
 docker-compose up -d
 ```
 
+## 本地构建
+
+```bash
+docker build -t chaoszhu/browser-use-api:latest .
+```
 
 ## API
 
