@@ -1,6 +1,8 @@
 # 使用Python 3.11作为基础镜像
 FROM python:3.11-slim
 
+LABEL name="browser-use-api"
+
 # 设置工作目录
 WORKDIR /app
 
@@ -8,7 +10,7 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
-    DEFAULT_AI_PROVIDER=openai \
+    DEFAULT_AI_PROVIDER=google \
     BROWSER_USE_HEADFUL=false \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 

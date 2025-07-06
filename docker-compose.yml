@@ -1,6 +1,6 @@
 services:
   browser-use-api:
-    build: .
+    image: chaoszhu/browser-use-api:latest
     ports:
       - "8000:8000"
     env_file:
@@ -9,9 +9,6 @@ services:
       - ./browser-use-api/media:/app/media
       - ./browser-use-api/data:/app/data
     restart: unless-stopped
-    environment:
-      - DEFAULT_AI_PROVIDER=${DEFAULT_AI_PROVIDER:-google}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/ping"]
       interval: 30s
