@@ -1,0 +1,1 @@
+获取Google gemini api: https://aistudio.google.com/app/apikey

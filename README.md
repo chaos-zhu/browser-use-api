@@ -1,5 +1,7 @@
 # Browser Use Local Bridge for n8n
 
+Thx: https://github.com/henry0hai/browser-n8n-local
+
 This is a local bridge service that enables n8n to communicate with the Browser Use Python library. It mimics the Browser Use Cloud API endpoints but runs locally, allowing you to execute browser automation tasks without relying on the cloud service.
 
 ## Features
