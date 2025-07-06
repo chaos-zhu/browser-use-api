@@ -1,56 +1,67 @@
+# 使用Python 3.11作为基础镜像
 FROM python:3.11-slim
 
+# 设置工作目录
 WORKDIR /app
 
-# Install essential packages and dependencies needed for Playwright
+# 设置环境变量
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    DEFAULT_AI_PROVIDER=openai \
+    BROWSER_USE_HEADFUL=false \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# 安装系统依赖项（playwright需要的基础依赖）
 RUN apt-get update && apt-get install -y \
     wget \
-    gnupg \
+    curl \
     ca-certificates \
-    procps \
-    unzip \
-    # Additional dependencies that Playwright might need
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
+    fonts-liberation \
     libatk-bridge2.0-0 \
-    libcups2 \
     libdrm2 \
     libxkbcommon0 \
     libxcomposite1 \
     libxdamage1 \
-    libxfixes3 \
     libxrandr2 \
     libgbm1 \
+    libxss1 \
     libasound2 \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# 先复制requirements.txt并安装Python依赖
 COPY requirements.txt .
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN pip install --no-cache-dir -r requirements.txt
-RUN patchright install chromium --with-deps 
 
-# Copy the rest of the application
+# 创建playwright浏览器目录
+RUN mkdir -p /ms-playwright
+
+# 安装playwright浏览器（需要在创建用户前安装）
+RUN playwright install --with-deps chromium
+
+# 创建非root用户并设置家目录
+RUN groupadd -r appuser && useradd -r -g appuser -m appuser
+
+# 复制项目文件（排除media和data文件夹）
 COPY . .
 
-# Create a data directory with proper permissions
-RUN mkdir -p /app/data && chmod 777 /app/data
-RUN mkdir -p /app/media && chmod 777 /app/media
+# 创建必要的目录
+RUN mkdir -p /app/media /app/data /app/task_storage
 
-# Expose the port the app runs on
-EXPOSE 8000
+# 创建用户配置目录
+RUN mkdir -p /home/appuser/.config /home/appuser/.local /home/appuser/.cache
 
-# Create a non-root user to run the app
-RUN adduser --disabled-password --gecos "" appuser
-# Give appuser permissions to the necessary directories
-RUN chown -R appuser:appuser /app
+# 创建browser-use特定目录
+RUN mkdir -p /home/appuser/.config/browseruse/profiles/default
 
+# 设置文件所有者
+RUN chown -R appuser:appuser /app /home/appuser /ms-playwright
+
+# 切换到非root用户
 USER appuser
 
-# Set healthcheck to ensure the service is running properly
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:8000/api/v1/ping || exit 1
+# 暴露端口
+EXPOSE 8000
 
-# Command to run the application
-CMD ["python", "app.py"] 
+# 设置启动命令
+CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
