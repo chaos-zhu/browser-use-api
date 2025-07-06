@@ -14,10 +14,11 @@ from enum import Enum
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, Response, Query, Depends, Header
+from fastapi import FastAPI, HTTPException, Request, Response, Query, Depends, Header, Security
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from browser_use.llm import (
     ChatOpenAI,
@@ -151,6 +152,67 @@ class TaskStatusResponse(BaseModel):
 async def get_user_id(x_user_id: Optional[str] = Header(None)) -> str:
     """从请求头提取用户ID或使用默认值"""
     return x_user_id or DEFAULT_USER_ID
+
+
+# 添加API密钥认证
+# 创建HTTPBearer实例
+security = HTTPBearer()
+
+# API密钥认证依赖项
+async def verify_api_key(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
+    """验证API密钥"""
+    # 从环境变量获取有效的API密钥
+    valid_api_keys = os.environ.get("VALID_API_KEYS", "").split(",")
+    valid_api_keys = [key.strip() for key in valid_api_keys if key.strip()]
+
+    if not valid_api_keys:
+        # 如果没有设置API密钥，允许所有请求（开发模式）
+        logger.warning("没有设置VALID_API_KEYS环境变量，API认证已禁用")
+        return "anonymous"
+
+    # 验证提供的API密钥
+    if credentials.credentials not in valid_api_keys:
+        raise HTTPException(
+            status_code=401,
+            detail="无效的API密钥",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return credentials.credentials
+
+
+# 简化的API密钥验证（可选，使用Header方式）
+async def verify_api_key_header(x_api_key: Optional[str] = Header(None)) -> str:
+    """通过头部验证API密钥（替代Bearer token方式）"""
+    valid_api_keys = os.environ.get("VALID_API_KEYS", "").split(",")
+    valid_api_keys = [key.strip() for key in valid_api_keys if key.strip()]
+
+    if not valid_api_keys:
+        logger.warning("没有设置VALID_API_KEYS环境变量，API认证已禁用")
+        return "anonymous"
+
+    if not x_api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="缺少API密钥头部 X-API-Key"
+        )
+
+    if x_api_key not in valid_api_keys:
+        raise HTTPException(
+            status_code=401,
+            detail="无效的API密钥"
+        )
+
+    return x_api_key
+
+
+# 组合认证依赖项（同时验证API密钥和获取用户ID）
+async def get_authenticated_user_id(
+    api_key: str = Depends(verify_api_key_header),
+    user_id: str = Depends(get_user_id)
+) -> str:
+    """返回验证后的用户ID"""
+    return user_id
 
 
 # 实用函数
@@ -431,7 +493,7 @@ async def execute_task(task_id: str, instruction: str, ai_provider: str, user_id
 
 # API路由
 @app.post("/api/v1/run-task", response_model=TaskResponse)
-async def run_task(request: TaskRequest, user_id: str = Depends(get_user_id)):
+async def run_task(request: TaskRequest, user_id: str = Depends(get_authenticated_user_id)):
     """启动浏览器自动化任务"""
     task_id = str(uuid.uuid4())
     now = datetime.now(UTC).isoformat() + "Z"
@@ -496,7 +558,7 @@ async def automated_screenshot(agent, task_id, user_id=DEFAULT_USER_ID):
 
 
 @app.get("/api/v1/task/{task_id}/status", response_model=TaskStatusResponse)
-async def get_task_status(task_id: str, user_id: str = Depends(get_user_id)):
+async def get_task_status(task_id: str, user_id: str = Depends(get_authenticated_user_id)):
     """获取任务状态"""
     task = task_storage.get_task(task_id, user_id)
     if not task:
@@ -639,7 +701,7 @@ async def capture_screenshot(agent, task_id, user_id=DEFAULT_USER_ID):
 
 
 @app.get("/api/v1/task/{task_id}", response_model=dict)
-async def get_task(task_id: str, user_id: str = Depends(get_user_id)):
+async def get_task(task_id: str, user_id: str = Depends(get_authenticated_user_id)):
     """获取完整任务详情"""
     task = task_storage.get_task(task_id, user_id)
     if not task:
@@ -649,7 +711,7 @@ async def get_task(task_id: str, user_id: str = Depends(get_user_id)):
 
 
 @app.put("/api/v1/stop-task/{task_id}")
-async def stop_task(task_id: str, user_id: str = Depends(get_user_id)):
+async def stop_task(task_id: str, user_id: str = Depends(get_authenticated_user_id)):
     """停止运行中的任务"""
     task = task_storage.get_task(task_id, user_id)
     if not task:
@@ -678,7 +740,7 @@ async def stop_task(task_id: str, user_id: str = Depends(get_user_id)):
 
 
 @app.put("/api/v1/pause-task/{task_id}")
-async def pause_task(task_id: str, user_id: str = Depends(get_user_id)):
+async def pause_task(task_id: str, user_id: str = Depends(get_authenticated_user_id)):
     """暂停运行中的任务"""
     task = task_storage.get_task(task_id, user_id)
     if not task:
@@ -699,7 +761,7 @@ async def pause_task(task_id: str, user_id: str = Depends(get_user_id)):
 
 
 @app.put("/api/v1/resume-task/{task_id}")
-async def resume_task(task_id: str, user_id: str = Depends(get_user_id)):
+async def resume_task(task_id: str, user_id: str = Depends(get_authenticated_user_id)):
     """恢复暂停的任务"""
     task = task_storage.get_task(task_id, user_id)
     if not task:
@@ -721,7 +783,7 @@ async def resume_task(task_id: str, user_id: str = Depends(get_user_id)):
 
 @app.get("/api/v1/list-tasks")
 async def list_tasks(
-    user_id: str = Depends(get_user_id),
+    user_id: str = Depends(get_authenticated_user_id),
     page: int = Query(1, ge=1),
     per_page: int = Query(100, ge=1, le=1000)
 ):
@@ -730,7 +792,7 @@ async def list_tasks(
 
 
 @app.get("/live/{task_id}", response_class=HTMLResponse)
-async def live_view(task_id: str, user_id: str = Depends(get_user_id)):
+async def live_view(task_id: str, user_id: str = Depends(get_authenticated_user_id)):
     """获取可以嵌入iframe的任务实时视图"""
     task = task_storage.get_task(task_id, user_id)
     if not task:
@@ -895,12 +957,18 @@ async def ping():
 @app.get("/api/v1/debug/config")
 async def debug_config():
     """调试端点用于检查配置"""
+    # 检查API密钥配置
+    valid_api_keys = os.environ.get("VALID_API_KEYS", "").split(",")
+    valid_api_keys = [key.strip() for key in valid_api_keys if key.strip()]
+
     return {
         "default_ai_provider": os.environ.get("DEFAULT_AI_PROVIDER", "NOT_SET"),
         "google_api_key_configured": bool(os.environ.get("GOOGLE_API_KEY")),
         "openai_api_key_configured": bool(os.environ.get("OPENAI_API_KEY")),
         "browser_headful": os.environ.get("BROWSER_USE_HEADFUL", "false"),
-        "available_providers": ["openai", "google", "anthropic", "mistral", "ollama", "azure", "bedrock", "groq"]
+        "available_providers": ["openai", "google", "anthropic", "mistral", "ollama", "azure", "bedrock", "groq"],
+        "auth_enabled": len(valid_api_keys) > 0,
+        "valid_api_keys_count": len(valid_api_keys)
     }
 
 
@@ -926,7 +994,7 @@ async def browser_config():
 
 
 @app.get("/api/v1/task/{task_id}/media")
-async def get_task_media(task_id: str, user_id: str = Depends(get_user_id), type: Optional[str] = None):
+async def get_task_media(task_id: str, user_id: str = Depends(get_authenticated_user_id), type: Optional[str] = None):
     """返回任务执行期间生成的任何录制或媒体的链接"""
     task = task_storage.get_task(task_id, user_id)
     if not task:
@@ -999,7 +1067,7 @@ async def get_task_media(task_id: str, user_id: str = Depends(get_user_id), type
 
 
 @app.get("/api/v1/task/{task_id}/media/list")
-async def list_task_media(task_id: str, user_id: str = Depends(get_user_id), type: Optional[str] = None):
+async def list_task_media(task_id: str, user_id: str = Depends(get_authenticated_user_id), type: Optional[str] = None):
     """返回与任务相关的媒体文件的详细信息"""
     # 检查媒体目录是否存在
     task_media_dir = MEDIA_DIR / task_id
