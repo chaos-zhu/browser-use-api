@@ -112,14 +112,77 @@ async def add_json_serialization(request: Request, call_next):
     return response
 
 
-# 启用CORS
+# 启用CORS - 支持跨域请求
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # 允许所有来源
+    allow_credentials=False,  # 禁用凭据以支持通配符来源
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"],  # 允许的HTTP方法
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",  # Bearer token认证
+        "X-API-Key",      # API密钥认证
+        "X-User-ID",      # 用户ID头部
+        "X-Requested-With",
+        "Origin",
+        "User-Agent",
+        "Cache-Control",
+        "Pragma",
+    ],
+    expose_headers=[
+        "Content-Type",
+        "Content-Length",
+        "Content-Disposition",
+        "X-Total-Count",
+        "X-Page-Count",
+    ],
+    max_age=3600,  # 预检请求缓存时间（秒）
 )
+
+# 动态CORS配置函数
+def get_cors_config():
+    """获取CORS配置信息"""
+    # 从环境变量读取CORS配置
+    cors_origins = os.environ.get("CORS_ORIGINS", "*")
+    cors_credentials = os.environ.get("CORS_CREDENTIALS", "false").lower() == "true"
+
+    # 如果设置了特定的来源且启用了凭据，则需要重新配置
+    if cors_origins != "*" and cors_credentials:
+        return {
+            "allow_origins": cors_origins.split(","),
+            "allow_credentials": cors_credentials,
+            "note": "使用特定来源和凭据模式"
+        }
+    else:
+        return {
+            "allow_origins": ["*"],
+            "allow_credentials": False,
+            "note": "使用通配符来源模式（推荐）"
+        }
+
+# 添加OPTIONS处理的中间件
+@app.middleware("http")
+async def cors_handler(request: Request, call_next):
+    """处理CORS预检请求"""
+    if request.method == "OPTIONS":
+        # 处理预检请求
+        response = Response()
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Accept, Accept-Language, Content-Language, Content-Type, Authorization, X-API-Key, X-User-ID, X-Requested-With, Origin, User-Agent, Cache-Control, Pragma"
+        response.headers["Access-Control-Max-Age"] = "3600"
+        return response
+
+    response = await call_next(request)
+
+    # 添加额外的CORS头部
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Expose-Headers"] = "Content-Type, Content-Length, Content-Disposition, X-Total-Count, X-Page-Count"
+
+    return response
 
 # 初始化任务存储
 task_storage = get_task_storage()
@@ -961,6 +1024,9 @@ async def debug_config():
     valid_api_keys = os.environ.get("VALID_API_KEYS", "").split(",")
     valid_api_keys = [key.strip() for key in valid_api_keys if key.strip()]
 
+    # 获取CORS配置
+    cors_config = get_cors_config()
+
     return {
         "default_ai_provider": os.environ.get("DEFAULT_AI_PROVIDER", "NOT_SET"),
         "google_api_key_configured": bool(os.environ.get("GOOGLE_API_KEY")),
@@ -968,7 +1034,10 @@ async def debug_config():
         "browser_headful": os.environ.get("BROWSER_USE_HEADFUL", "false"),
         "available_providers": ["openai", "google", "anthropic", "mistral", "ollama", "azure", "bedrock", "groq"],
         "auth_enabled": len(valid_api_keys) > 0,
-        "valid_api_keys_count": len(valid_api_keys)
+        "valid_api_keys_count": len(valid_api_keys),
+        "cors_config": cors_config,
+        "cors_origins": os.environ.get("CORS_ORIGINS", "*"),
+        "cors_credentials": os.environ.get("CORS_CREDENTIALS", "false"),
     }
 
 
