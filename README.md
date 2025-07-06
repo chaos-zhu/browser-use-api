@@ -28,6 +28,23 @@ docker-compose up -d
 docker build -t chaoszhu/browser-use-api:latest .
 ```
 
+## 本地启动
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+pip install -r requirements.txt
+
+cp .env-example .env
+
+python app.py
+
+```
+The server will start at http://localhost:8000 by default.
+
+You can access the API documentation at http://localhost:8000/docs
+
 ## API
 
 文档地址： http://{your_ip}:8000/docs
