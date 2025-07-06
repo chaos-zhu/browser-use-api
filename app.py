@@ -74,6 +74,7 @@ logger = logging.getLogger("browser-use-bridge")
 app = FastAPI(title="Browser Use Bridge API")
 
 # Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
 
 
@@ -619,6 +620,18 @@ async def automated_screenshot(agent, task_id, user_id=DEFAULT_USER_ID):
         # 仍然尝试截图，即使无法获取页面信息
         await capture_screenshot(agent, task_id, user_id)
 
+# WebUI路由
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """提供WebUI主页面"""
+    try:
+        with open("static/index.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    except FileNotFoundError:
+        return HTMLResponse(
+            content="<h1>WebUI not found</h1><p>Please ensure static/index.html exists.</p>",
+            status_code=404
+        )
 
 @app.get("/api/v1/task/{task_id}/status", response_model=TaskStatusResponse)
 async def get_task_status(task_id: str, user_id: str = Depends(get_authenticated_user_id)):
