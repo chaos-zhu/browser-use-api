@@ -1,10 +1,10 @@
 # Browser Use API
 
-更新了下henry0hai/browser-n8n-local，发现有些日子没维护跑不起来了，于是优化(反向)了下
-原项目地址: https://github.com/henry0hai/browser-n8n-local
+> 更新了下henry0hai/browser-n8n-local，发现有些日子没维护跑不起来了，于是优化(反向)了下.
 
-使用browser-use构建的api，只需要docker-compose即可一键启动
+> 原项目地址: https://github.com/henry0hai/browser-n8n-local
 
+基于browser-use构建的api，只需要docker-compose即可一键启动
 
 ## docker-compose.yml启动
 ```bash
